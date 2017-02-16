@@ -184,33 +184,6 @@ function islandora_large_image_preprocess_islandora_large_image(&$variables) {
   $variables['metadata'] = islandora_retrieve_metadata_markup($islandora_object);
   $variables['description'] = islandora_retrieve_description_markup($islandora_object);
 
-  module_load_include('inc', 'islandora_solr_metadata', 'includes/db');
-  $elements = array(
-    'islandora_object' => $islandora_object,
-    'print' => false,
-    'associations' => islandora_solr_metadata_get_associations_by_cmodels($islandora_object->models),
-  );
-  drupal_alter('islandora_solr_metadata_display_elements', $elements);
-  $db_fields = array();
-  $solr_fields =& $elements['solr_fields'];
-  $associations = $elements['associations'];
-
-  foreach ($associations as $configuration_id) {
-    $field = islandora_solr_metadata_get_fields($configuration_id['configuration_id']);
-    $db_fields = array_merge($db_fields, $field);
-  }
-  foreach ($db_fields as $solr_field => $value) {
-    if (isset($solr_fields[$solr_field])) {
-      continue;
-    }
-    // Make an array for use later on.
-    $solr_fields[$solr_field] = $value + array(
-      'value' => array(),
-    );
-  }
-
-  $found = islandora_solr_metadata_query_fields($islandora_object, $solr_fields);
-
   // Thumbnail.
   if (isset($islandora_object['TN']) && islandora_datastream_access(ISLANDORA_VIEW_OBJECTS, $islandora_object['TN'])) {
     $params = array(
@@ -223,20 +196,28 @@ function islandora_large_image_preprocess_islandora_large_image(&$variables) {
 
   $params = array();
 
-  #ege
-  // Get token to allow access to XACML protected datastreams.
-  // Always use token authentication in case there is a global policy.
-  module_load_include('inc', 'islandora', 'includes/authtokens');
-  $token = islandora_get_object_token($islandora_object->id, 'JP2', 2);
-  if(!empty($solr_fields['mods_url_local_ms']['value'])) {
-      $jp2_url = $solr_fields['mods_url_local_ms']['value'];
+  if($islandora_object['MODS'] and $islandora_object['MODS']->content) {
+      foreach(explode("\n", $islandora_object['MODS']->content) as $row) {
+          if(strpos($row, '<url type="local"') !== false) {
+              $url = trim(str_replace(['<url type="local">', '</url>'], '', $row));
+              break;
+          }
+      }
+  }
+
+  if(!empty($url)) {
+      $jp2_url = $url;
   }
   else if (isset($islandora_object['JP2']) && islandora_datastream_access(ISLANDORA_VIEW_OBJECTS, $islandora_object['JP2'])) {
-      $jp2_url = url("islandora/object/{$islandora_object->id}/datastream/JP2/view",
-      array(
-        'absolute' => TRUE,
-        'query' => array('token' => $token),
-      ));
+    // Get token to allow access to XACML protected datastreams.
+    // Always use token authentication in case there is a global policy.
+    module_load_include('inc', 'islandora', 'includes/authtokens');
+    $token = islandora_get_object_token($islandora_object->id, 'JP2', 2);
+    $jp2_url = url("islandora/object/{$islandora_object->id}/datastream/JP2/view",
+    array(
+      'absolute' => TRUE,
+      'query' => array('token' => $token),
+    ));
   }
 
   // Display large image.
