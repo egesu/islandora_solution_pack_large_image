@@ -197,12 +197,12 @@ function islandora_large_image_preprocess_islandora_large_image(&$variables) {
   $params = array();
 
   if($islandora_object['MODS'] and $islandora_object['MODS']->content) {
-      foreach(explode("\n", $islandora_object['MODS']->content) as $row) {
-          if(strpos($row, '<url type="local"') !== false) {
-              $url = trim(str_replace(['<url type="local">', '</url>'], '', $row));
-              break;
-          }
-      }
+    $regex = '#<url type="local">(.*?)</url>#';
+    $matches = [];
+    $code = preg_match($regex, $islandora_object['MODS']->content, $matches);
+    if(count($matches) > 1) {
+      $url = $matches[1];
+    }
   }
 
   if(!empty($url)) {
